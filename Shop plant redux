@@ -1,0 +1,236 @@
+// This is a complete React + Redux app structure for the plant shop project
+
+// Directory structure (simplified):
+// src/
+//   components/
+//     Header.jsx
+//     LandingPage.jsx
+//     ProductList.jsx
+//     CartPage.jsx
+//   redux/
+//     store.js
+//     cartSlice.js
+//   assets/
+//     images/
+//       plant1.jpg ... plant6.jpg
+//   App.jsx
+//   index.js
+
+// redux/store.js
+import { configureStore } from '@reduxjs/toolkit';
+import cartReducer from './cartSlice';
+
+export const store = configureStore({
+  reducer: {
+    cart: cartReducer,
+  },
+});
+
+// redux/cartSlice.js
+import { createSlice } from '@reduxjs/toolkit';
+
+const initialState = {
+  items: {},
+  totalItems: 0,
+  totalPrice: 0,
+};
+
+const cartSlice = createSlice({
+  name: 'cart',
+  initialState,
+  reducers: {
+    addItem(state, action) {
+      const plant = action.payload;
+      if (!state.items[plant.id]) {
+        state.items[plant.id] = { ...plant, quantity: 1 };
+        state.totalItems++;
+        state.totalPrice += plant.price;
+      }
+    },
+    incrementItem(state, action) {
+      const id = action.payload;
+      state.items[id].quantity++;
+      state.totalItems++;
+      state.totalPrice += state.items[id].price;
+    },
+    decrementItem(state, action) {
+      const id = action.payload;
+      if (state.items[id].quantity > 1) {
+        state.items[id].quantity--;
+        state.totalItems--;
+        state.totalPrice -= state.items[id].price;
+      }
+    },
+    deleteItem(state, action) {
+      const id = action.payload;
+      state.totalItems -= state.items[id].quantity;
+      state.totalPrice -= state.items[id].price * state.items[id].quantity;
+      delete state.items[id];
+    },
+  },
+});
+
+export const { addItem, incrementItem, decrementItem, deleteItem } = cartSlice.actions;
+export default cartSlice.reducer;
+
+// components/Header.jsx
+import { Link } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import { ShoppingCart } from 'lucide-react';
+
+export default function Header() {
+  const totalItems = useSelector(state => state.cart.totalItems);
+  return (
+    <header className="flex justify-between items-center p-4 bg-green-100 shadow">
+      <h1 className="text-xl font-bold">GreenLeaf Co.</h1>
+      <nav className="flex gap-4">
+        <Link to="/products">Products</Link>
+        <Link to="/cart" className="relative">
+          <ShoppingCart />
+          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full px-1">{totalItems}</span>
+        </Link>
+      </nav>
+    </header>
+  );
+}
+
+// components/LandingPage.jsx
+import { Link } from 'react-router-dom';
+
+export default function LandingPage() {
+  return (
+    <div className="h-screen bg-cover bg-center flex flex-col justify-center items-center text-white" style={{ backgroundImage: 'url(/assets/images/background.jpg)' }}>
+      <h1 className="text-5xl font-bold mb-4">GreenLeaf Co.</h1>
+      <p className="mb-6 max-w-xl text-center">We offer the finest selection of houseplants to bring nature into your home.</p>
+      <Link to="/products" className="bg-green-500 hover:bg-green-600 px-6 py-2 rounded">Get Started</Link>
+    </div>
+  );
+}
+
+// components/ProductList.jsx
+import { useDispatch, useSelector } from 'react-redux';
+import { addItem } from '../redux/cartSlice';
+import products from '../data/products';
+
+export default function ProductList() {
+  const cartItems = useSelector(state => state.cart.items);
+  const dispatch = useDispatch();
+
+  const categories = ['Succulents', 'Ferns', 'Flowering'];
+
+  return (
+    <div className="p-4">
+      <h2 className="text-2xl font-bold mb-4">Our Plants</h2>
+      {categories.map(category => (
+        <div key={category}>
+          <h3 className="text-xl mt-4 mb-2">{category}</h3>
+          <div className="grid grid-cols-3 gap-4">
+            {products.filter(p => p.category === category).map(plant => (
+              <div key={plant.id} className="border p-2 rounded shadow">
+                <img src={plant.image} alt={plant.name} className="w-full h-32 object-cover mb-2" />
+                <h4 className="font-bold">{plant.name}</h4>
+                <p>${plant.price.toFixed(2)}</p>
+                <button
+                  disabled={cartItems[plant.id]}
+                  onClick={() => dispatch(addItem(plant))}
+                  className="bg-green-500 hover:bg-green-600 px-2 py-1 rounded text-white mt-2 disabled:opacity-50"
+                >
+                  {cartItems[plant.id] ? 'Added' : 'Add to Cart'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// components/CartPage.jsx
+import { useDispatch, useSelector } from 'react-redux';
+import { incrementItem, decrementItem, deleteItem } from '../redux/cartSlice';
+import { Link } from 'react-router-dom';
+
+export default function CartPage() {
+  const items = useSelector(state => state.cart.items);
+  const totalItems = useSelector(state => state.cart.totalItems);
+  const totalPrice = useSelector(state => state.cart.totalPrice);
+  const dispatch = useDispatch();
+
+  return (
+    <div className="p-4">
+      <h2 className="text-2xl font-bold mb-4">Shopping Cart</h2>
+      <p>Total items: {totalItems}</p>
+      <p>Total cost: ${totalPrice.toFixed(2)}</p>
+      <div className="mt-4">
+        {Object.values(items).map(item => (
+          <div key={item.id} className="flex items-center justify-between border-b py-2">
+            <img src={item.image} alt={item.name} className="w-16 h-16 object-cover" />
+            <div className="flex-1 ml-4">
+              <h4>{item.name}</h4>
+              <p>${item.price.toFixed(2)}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => dispatch(decrementItem(item.id))} className="px-2 bg-gray-200">-</button>
+              <span>{item.quantity}</span>
+              <button onClick={() => dispatch(incrementItem(item.id))} className="px-2 bg-gray-200">+</button>
+            </div>
+            <button onClick={() => dispatch(deleteItem(item.id))} className="ml-4 bg-red-500 text-white px-2 py-1 rounded">Delete</button>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 flex gap-4">
+        <Link to="/products" className="bg-blue-500 text-white px-4 py-2 rounded">Continue Shopping</Link>
+        <button className="bg-green-500 text-white px-4 py-2 rounded">Checkout (Coming Soon)</button>
+      </div>
+    </div>
+  );
+}
+
+// App.jsx
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Header from './components/Header';
+import LandingPage from './components/LandingPage';
+import ProductList from './components/ProductList';
+import CartPage from './components/CartPage';
+
+function App() {
+  return (
+    <Router>
+      <Header />
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/products" element={<ProductList />} />
+        <Route path="/cart" element={<CartPage />} />
+      </Routes>
+    </Router>
+  );
+}
+
+export default App;
+
+// index.js
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import { Provider } from 'react-redux';
+import { store } from './redux/store';
+import './index.css';
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <Provider store={store}>
+    <App />
+  </Provider>
+);
+
+// Sample data/products.js
+const products = [
+  { id: '1', name: 'Aloe Vera', price: 10, category: 'Succulents', image: '/assets/images/plant1.jpg' },
+  { id: '2', name: 'Snake Plant', price: 12, category: 'Succulents', image: '/assets/images/plant2.jpg' },
+  { id: '3', name: 'Boston Fern', price: 15, category: 'Ferns', image: '/assets/images/plant3.jpg' },
+  { id: '4', name: 'Maidenhair Fern', price: 14, category: 'Ferns', image: '/assets/images/plant4.jpg' },
+  { id: '5', name: 'Peace Lily', price: 18, category: 'Flowering', image: '/assets/images/plant5.jpg' },
+  { id: '6', name: 'Orchid', price: 20, category: 'Flowering', image: '/assets/images/plant6.jpg' },
+];
+
+export default products;
